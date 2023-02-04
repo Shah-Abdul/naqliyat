@@ -2,8 +2,8 @@ import mongoClientPromise from "../../lib/mongodb";
 
 import { getBooks } from "./books";
 
-const LANGUAGES = ["english", "urdu"];
-const PAGE_SIZES = [10, 25, 50];
+export const LANGUAGES = ["english", "urdu"];
+export const PAGE_SIZES = [10, 25, 50];
 
 export const getNaqliyats = async (
   filter = {},
