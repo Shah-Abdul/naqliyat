@@ -6,7 +6,12 @@ const NaqliyatContainer = ({ naqliyatData, loading }) => {
   return (
     <Paper elevation={3} style={{ paddingBottom: "20px" }}>
       <ul
-        style={{ textAlign: "center", fontSize: "20px", listStyleType: "none" }}
+        style={{
+          textAlign: "center",
+          fontSize: "20px",
+          listStyleType: "none",
+          padding: "8px",
+        }}
       >
         {loading ? (
           <>
