@@ -119,7 +119,7 @@ const PageSizeSelect = ({ value, pageSizes, onChange }) => {
 };
 
 function HomePage(props) {
-  const { window, books, languages, pageSizes } = props;
+  const { window, books = [], languages = [], pageSizes = [] } = props;
   const router = useRouter();
   const { query } = router;
   const {
@@ -458,9 +458,9 @@ const PageBackAndForward = ({
 
 const PageNumberAndIndices = ({ pageNumber, pageIndexMin, pageIndexMax }) => (
   <div style={{ display: "flex", justifyContent: "space-between" }}>
-    <span>{pageNumber}</span>
-    <span>
-      {pageIndexMin}-{pageIndexMax}
+    <span style={{ fontWeight: "bold" }}>Page {pageNumber}</span>
+    <span style={{ fontWeight: "bold" }}>
+      # {pageIndexMin}-{pageIndexMax}
     </span>
   </div>
 );
