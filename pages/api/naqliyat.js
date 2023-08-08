@@ -101,7 +101,7 @@ const getNaqliyatsAPIHandler = async (req, res) => {
 
 export default getNaqliyatsAPIHandler;
 
-const respondWithError = (res, status, message, data) => {
+export const respondWithError = (res, status, message, data) => {
   res.status(status).json({ message, data });
 };
 
@@ -147,7 +147,7 @@ const validatePageSize = (pageSizeString) => {
   };
 };
 
-const validateBookId = async (bookIdString) => {
+export const validateBookId = async (bookIdString) => {
   if (!bookIdString) {
     // Default bookId.
     return {

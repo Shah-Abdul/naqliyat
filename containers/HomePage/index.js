@@ -1,4 +1,4 @@
-import * as React from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
@@ -10,6 +10,8 @@ import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
+import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
+import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
@@ -19,10 +21,13 @@ import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import OutlinedInput from "@mui/material/OutlinedInput";
 
+import NaqliyatContainer from "./NaqliyatContainer";
+
 /** @jsxImportSource @emotion/react */
 import { css, jsx } from "@emotion/react";
 
 import { useRouter } from "next/router";
+import { Skeleton } from "@mui/material";
 
 const navItems = ["Book", "Languages", "Page size"];
 
@@ -115,11 +120,51 @@ const PageSizeSelect = ({ value, pageSizes, onChange }) => {
 
 function HomePage(props) {
   const { window, books, languages, pageSizes } = props;
-  console.log({ languages });
-  const [mobileOpen, setMobileOpen] = React.useState(false);
   const router = useRouter();
   const { query } = router;
-  const { bookId = 1, lang = [], pageSize = 25 } = query;
+  const {
+    bookId = 1,
+    lang = languages,
+    pageSize: pageSizeParam = 25,
+    startIndex: startIndexParam = 0,
+  } = query;
+
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [naqliyat, setNaqiyat] = useState([]);
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [naqliyatCountForBook, setNaqliyatCount] = useState(25);
+
+  const { pageSize, startIndex } = useMemo(() => {
+    let pageSize = parseInt(pageSizeParam),
+      startIndex = parseInt(startIndexParam);
+    if (isNaN(pageSize)) {
+      pageSize = 25;
+    }
+    if (isNaN(startIndex)) {
+      startIndex = 0;
+    }
+    return { pageSize, startIndex };
+  }, [pageSizeParam, startIndexParam]);
+
+  const { prevPageButtonDisabled, nextPageButtonDisabled } = useMemo(() => {
+    let prevPageButtonDisabled = false,
+      nextPageButtonDisabled = false;
+    if (startIndex < pageSize) {
+      prevPageButtonDisabled = true;
+    }
+    if (startIndex + pageSize > naqliyatCountForBook) {
+      nextPageButtonDisabled = true;
+    }
+    return { prevPageButtonDisabled, nextPageButtonDisabled };
+  }, [naqliyatCountForBook, startIndex, pageSize]);
+
+  const { pageNumber, pageIndexMin, pageIndexMax } = useMemo(() => {
+    const pageIndexMin = startIndex || 1;
+    const pageIndexMax = Math.min(naqliyatCountForBook, startIndex + pageSize);
+    const pageNumber = 1 + parseInt(startIndex / pageSize);
+    return { pageNumber, pageIndexMin, pageIndexMax };
+  }, [startIndex, pageSize, naqliyatCountForBook]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -140,6 +185,31 @@ function HomePage(props) {
   const handlePageSizeChange = (pageSize) => {
     router.replace({
       query: { ...query, pageSize },
+    });
+  };
+
+  const handleBack = () => {
+    router.replace({
+      query: { ...query, startIndex: Math.max(0, startIndex - pageSize) },
+    });
+  };
+
+  const handleNext = () => {
+    router.replace({
+      query: { ...query, startIndex: startIndex + pageSize },
+    });
+  };
+
+  const handleRetryOnError = () => {
+    router.replace({
+      query: {
+        ...query,
+        startIndex: 0,
+        bookId: 1,
+        pageSize: 25,
+        startIndex: 0,
+        lang: [],
+      },
     });
   };
 
@@ -193,6 +263,58 @@ function HomePage(props) {
   const container =
     window !== undefined ? () => window.document.body : undefined;
 
+  useEffect(() => {
+    const fetchNaqliyat = async () => {
+      try {
+        setLoading(true);
+        const resp = await fetch(
+          `/api/naqliyat?bookId=${bookId}&pageSize=${pageSize}${
+            startIndex ? `&startAtIndex=${startIndex}` : ""
+          }${
+            lang.length
+              ? `&lang=${typeof lang === "string" ? lang : lang.join(",")}`
+              : ""
+          }`
+        );
+        if (!resp?.ok) {
+          throw new Error("Something went wrong.");
+        }
+        const naqliyatResp = await resp.json();
+        setLoading(false);
+        setError(false);
+        setNaqiyat(naqliyatResp);
+      } catch (e) {
+        console.error(e);
+        setError(true);
+        setLoading(false);
+      }
+    };
+    fetchNaqliyat();
+  }, [bookId, lang, pageSize, startIndex]);
+
+  useEffect(() => {
+    const fetchNaqliyatCount = async () => {
+      try {
+        setLoading(true);
+        const resp = await fetch(`/api/naqliyat-count?bookId=${bookId}`);
+        if (!resp?.ok) {
+          throw new Error("Something went wrong.");
+        }
+        const naqliyatResp = await resp.json();
+        setLoading(false);
+        setError(false);
+        setNaqliyatCount(naqliyatResp);
+      } catch (e) {
+        console.error(e);
+        setError(true);
+        setLoading(false);
+      }
+    };
+    if (!isNaN(bookId)) {
+      fetchNaqliyatCount();
+    }
+  }, [bookId]);
+
   return (
     <Box sx={{ display: "flex" }}>
       <AppBar component="nav">
@@ -213,12 +335,36 @@ function HomePage(props) {
           >
             Naqliyat
           </Typography>
-          <Box sx={{ display: { xs: "none", sm: "block" } }}>
-            {navItems.map((item) => (
+          <Box
+            sx={{
+              display: { xs: "none", sm: "flex" },
+              padding: { sm: "16px" },
+            }}
+          >
+            {/* {navItems.map((item) => (
               <Button key={item} sx={{ color: "#fff" }}>
                 {item}
               </Button>
-            ))}
+            ))} */}
+            <div style={{ paddingRight: "8px" }}>
+              <BookSelect
+                books={books}
+                value={bookId}
+                onChange={handleBookChange}
+              />
+            </div>
+            <div style={{ paddingRight: "8px" }}>
+              <LanguageSelect
+                languages={languages}
+                value={typeof lang === "string" ? [lang] : lang}
+                onChange={handleLangChange}
+              />
+            </div>
+            <PageSizeSelect
+              pageSizes={pageSizes}
+              value={pageSize}
+              onChange={handlePageSizeChange}
+            />
             {/* <Filters /> */}
           </Box>
         </Toolbar>
@@ -244,48 +390,78 @@ function HomePage(props) {
           {drawer}
         </Drawer>
       </Box>
-      <Box component="main" sx={{ p: 3 }}>
+      <Box component="main" sx={{ p: 3, width: "100%" }}>
         <Toolbar />
-        <Typography>
-          Lorem ipsum dolor sit amet consectetur adipisicing elit. Similique
-          unde fugit veniam eius, perspiciatis sunt? Corporis qui ducimus
-          quibusdam, aliquam dolore excepturi quae. Distinctio enim at eligendi
-          perferendis in cum quibusdam sed quae, accusantium et aperiam? Quod
-          itaque exercitationem, at ab sequi qui modi delectus quia corrupti
-          alias distinctio nostrum. Minima ex dolor modi inventore sapiente
-          necessitatibus aliquam fuga et. Sed numquam quibusdam at officia
-          sapiente porro maxime corrupti perspiciatis asperiores, exercitationem
-          eius nostrum consequuntur iure aliquam itaque, assumenda et! Quibusdam
-          temporibus beatae doloremque voluptatum doloribus soluta accusamus
-          porro reprehenderit eos inventore facere, fugit, molestiae ab officiis
-          illo voluptates recusandae. Vel dolor nobis eius, ratione atque
-          soluta, aliquam fugit qui iste architecto perspiciatis. Nobis,
-          voluptatem! Cumque, eligendi unde aliquid minus quis sit debitis
-          obcaecati error, delectus quo eius exercitationem tempore. Delectus
-          sapiente, provident corporis dolorum quibusdam aut beatae repellendus
-          est labore quisquam praesentium repudiandae non vel laboriosam quo ab
-          perferendis velit ipsa deleniti modi! Ipsam, illo quod. Nesciunt
-          commodi nihil corrupti cum non fugiat praesentium doloremque
-          architecto laborum aliquid. Quae, maxime recusandae? Eveniet dolore
-          molestiae dicta blanditiis est expedita eius debitis cupiditate porro
-          sed aspernatur quidem, repellat nihil quasi praesentium quia eos,
-          quibusdam provident. Incidunt tempore vel placeat voluptate iure
-          labore, repellendus beatae quia unde est aliquid dolor molestias
-          libero. Reiciendis similique exercitationem consequatur, nobis placeat
-          illo laudantium! Enim perferendis nulla soluta magni error, provident
-          repellat similique cupiditate ipsam, et tempore cumque quod! Qui, iure
-          suscipit tempora unde rerum autem saepe nisi vel cupiditate iusto.
-          Illum, corrupti? Fugiat quidem accusantium nulla. Aliquid inventore
-          commodi reprehenderit rerum reiciendis! Quidem alias repudiandae eaque
-          eveniet cumque nihil aliquam in expedita, impedit quas ipsum nesciunt
-          ipsa ullam consequuntur dignissimos numquam at nisi porro a, quaerat
-          rem repellendus. Voluptates perspiciatis, in pariatur impedit, nam
-          facilis libero dolorem dolores sunt inventore perferendis, aut
-          sapiente modi nesciunt.
-        </Typography>
+        {error ? (
+          <Typography style={{ textAlign: "center", padding: "16px" }}>
+            Something went wrong. Click{" "}
+            <Button variant="text" onClick={() => handleRetryOnError()}>
+              here
+            </Button>{" "}
+            to start again.
+          </Typography>
+        ) : (
+          <React.Fragment>
+            <PageBackAndForward
+              handleBack={handleBack}
+              handleNext={handleNext}
+              prevPageButtonDisabled={prevPageButtonDisabled}
+              nextPageButtonDisabled={nextPageButtonDisabled}
+            />
+            <PageNumberAndIndices
+              {...{ pageNumber, pageIndexMin, pageIndexMax }}
+            />
+            <NaqliyatContainer naqliyatData={naqliyat} />
+            <PageBackAndForward
+              handleBack={handleBack}
+              handleNext={handleNext}
+              prevPageButtonDisabled={prevPageButtonDisabled}
+              nextPageButtonDisabled={nextPageButtonDisabled}
+            />
+          </React.Fragment>
+        )}
       </Box>
     </Box>
   );
 }
 
+const PageBackAndForward = ({
+  handleBack,
+  handleNext,
+  prevPageButtonDisabled,
+  nextPageButtonDisabled,
+}) => (
+  <div
+    style={{ paddingTop: "12px", display: "flex", justifyContent: "center" }}
+  >
+    <Button
+      disabled={prevPageButtonDisabled}
+      variant="outlined"
+      aria-label="Previous Page"
+      startIcon={<ArrowBackIosIcon />}
+      style={{ marginRight: "8px" }}
+      onClick={handleBack}
+    >
+      Prev Page
+    </Button>
+    <Button
+      disabled={nextPageButtonDisabled}
+      variant="outlined"
+      aria-label="Previous Page"
+      endIcon={<ArrowForwardIosIcon />}
+      onClick={handleNext}
+    >
+      Next Page
+    </Button>
+  </div>
+);
+
+const PageNumberAndIndices = ({ pageNumber, pageIndexMin, pageIndexMax }) => (
+  <div style={{ display: "flex", justifyContent: "space-between" }}>
+    <span>{pageNumber}</span>
+    <span>
+      {pageIndexMin}-{pageIndexMax}
+    </span>
+  </div>
+);
 export default HomePage;
