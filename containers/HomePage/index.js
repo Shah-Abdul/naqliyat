@@ -411,7 +411,7 @@ function HomePage(props) {
             <PageNumberAndIndices
               {...{ pageNumber, pageIndexMin, pageIndexMax }}
             />
-            <NaqliyatContainer naqliyatData={naqliyat} />
+            <NaqliyatContainer loading={loading && !naqliyat.length} naqliyatData={naqliyat} />
             <PageBackAndForward
               handleBack={handleBack}
               handleNext={handleNext}
@@ -457,7 +457,7 @@ const PageBackAndForward = ({
 );
 
 const PageNumberAndIndices = ({ pageNumber, pageIndexMin, pageIndexMax }) => (
-  <div style={{ display: "flex", justifyContent: "space-between" }}>
+  <div style={{ display: "flex", justifyContent: "space-between", paddingTop: '12px' }}>
     <span style={{ fontWeight: "bold" }}>Page {pageNumber}</span>
     <span style={{ fontWeight: "bold" }}>
       # {pageIndexMin}-{pageIndexMax}
